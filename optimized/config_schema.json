@@ -1,0 +1,52 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "LibertyShield Configuration",
+    "type": "object",
+    "required": ["target", "target_port", "duration"],
+    "properties": {
+        "target": {
+            "type": "string",
+            "format": "ipv4"
+        },
+        "target_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+        },
+        "duration": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "attack_vectors": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["volumetric", "protocol", "amplification", "worm", "locker"]
+            }
+        },
+        "max_workers": {
+            "type": "integer",
+            "default": 500
+        },
+        "spoof_source": {
+            "type": "string",
+            "format": "ipv4"
+        },
+        "amplifiers": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "format": "ipv4"
+            }
+        },
+        "enable_worm": {
+            "type": "boolean"
+        },
+        "enable_locker": {
+            "type": "boolean"
+        },
+        "locker_path": {
+            "type": "string"
+        }
+    }
+}
